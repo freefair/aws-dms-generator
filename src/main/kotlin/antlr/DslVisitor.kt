@@ -53,7 +53,7 @@ class DslVisitor : dms_dslBaseVisitor<List<DmsRule>>() {
         }
 
         if(type == "enum") {
-            return listOf(createEnumRule(objectLocator, value))
+            return createEnumRule(objectLocator, value, oldValue)
         }
 
         val subtype = ctx.subtype()?.text
@@ -71,26 +71,42 @@ class DslVisitor : dms_dslBaseVisitor<List<DmsRule>>() {
 
     private fun createEnumRule(
         objectLocator: DmsObjectLocator,
-        value: String?
-    ): DmsRule {
+        value: String?,
+        oldValue: String?
+    ): List<DmsRule> {
         val enum = enumDeclarations.firstOrNull { it.name == value }
         if(enum == null) throw IllegalArgumentException("$value is not found as enum")
-        var expression = "CASE {{column-name}} "
+        if(objectLocator.columnName?.contains("%") != false) throw IllegalArgumentException("Column name is required to have no wildcard for enum mapping")
+        var expression = "CASE \$${objectLocator.columnName} "
         enum.fields.forEach { expression += " WHEN ${it.value} THEN '${it.name}' " }
         expression += " END"
 
         val dmsDataType = DmsDataType("string", enum.fields.maxOf { it.name.length }.toString())
 
-        return DmsRule(
+        val creationRule = DmsRule(
             "enum ${objectLocator.fullName} $value",
             "transformation",
-            objectLocator,
-            "replace-column",
-            objectLocator.target,
-            null,
+            DmsObjectLocator(objectLocator.schemaName, objectLocator.tableName),
+            "add-column",
+            "column",
+            oldValue,
             null,
             expression,
             dmsDataType
         )
+
+        val deleteRule = DmsRule(
+            "delete ${objectLocator.fullName}",
+            "transformation",
+            objectLocator,
+            "remove-column",
+            "column",
+            null,
+            null,
+            null,
+            null
+        )
+
+        return listOf(creationRule, deleteRule)
     }
 }
