@@ -79,7 +79,7 @@ class DslVisitor : dms_dslBaseVisitor<List<DmsRule>>() {
         enum.fields.forEach { expression += " WHEN ${it.value} THEN '${it.name}' " }
         expression += " END"
 
-        val dmsDataType = DmsDataType("string", enum.fields.maxOf { it.value.length }.toString())
+        val dmsDataType = DmsDataType("string", enum.fields.maxOf { it.name.length }.toString())
 
         return DmsRule(
             "enum ${objectLocator.fullName} $value",
